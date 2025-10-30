@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Invoice Generator</title>
+  <!-- Load Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Configure Tailwind for custom colors (JS Consulting Navy/Red) -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // JS Consulting Primary Navy
+            'js-navy': '#1A2352',
+            // JS Consulting Accent Red
+            'js-red': '#E53935',
+            'light-gray': '#f5f7fa',
+          }
+        }
+      }
+    }
+  </script>
+  <style id="custom-styles">
+    /* Print Styles for PDF Generation */
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #invoice-preview {
+        /* Remove shadows/borders for clean printout */
+        box-shadow: none !important;
+        margin: 0 auto;
+        width: 100%;
+        min-height: 100vh;
+        padding: 0;
+      }
+      /* Force portrait orientation for A4 PDF print */
+      @page {
+        size: A4 portrait;
+        margin: 0.5in; /* Standard print margin */
+      }
+    }
+    
+    /* Dashboard Input Panel Responsiveness */
+    #input-panel {
+      display: grid;
+      gap: 1.5rem;
+      /* Default to 1 column on mobile */
+      grid-template-columns: repeat(1, 1fr);
+    }
+    @media (min-width: 640px) { /* sm breakpoint */
+      #input-panel {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (min-width: 1024px) { /* lg breakpoint */
+      #input-panel {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    /* Custom Shadow for professional look */
+    .shadow-custom {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Input field styling adjustments */
+    input[type="text"], input[type="number"], input[type="date"], select {
+      appearance: none; /* removes default arrow on select */
+    }
+    
+    /* Services list styling */
+    .service-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .service-item:last-child {
+      border-bottom: none;
+    }
+    
+    .service-actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+    
+    .service-actions button {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    #services-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+    }
+    
+    .service-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .service-row input {
+      flex: 1;
+    }
+    
+    .service-row .amount-input {
+      width: 120px !important;
+    }
+    
+    .service-row .remove-btn {
+      width: 140px !important;
+      padding: 0.5rem 1rem !important;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans antialiased flex flex-col items-center p-4 md:p-8">
+  <!-- Header & Title (no-print) -->
+  <header class="w-full max-w-4xl text-center mb-6 no-print">
+    <h1 class="text-3xl font-extrabold text-js-navy tracking-tight"> JS CONSULTING Invoice Generator </h1>
+  </header>
+
+  <!-- Main Input Panel (no-print) -->
+  <div class="w-full max-w-4xl bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 no-print border border-gray-200" id="dashboard">
+    <h2 class="text-xl font-semibold mb-6 text-js-navy border-b pb-3">Invoice Details Input</h2>
+    
+    <div id="input-panel">
+      <!-- Invoice Number - Readonly -->
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="invoice-number">Invoice Number</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy bg-gray-50 cursor-default" id="invoice-number" readonly="" type="text"/>
+      </div>
+      
+      <!-- Client Name -->
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="client-name">Client Name</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="client-name" placeholder="E.g., ABC Pvt Ltd" type="text"/>
+      </div>
+      
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="client-company">Client Company Name (Optional)</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="client-company" placeholder="E.g., Alpha Traders (Optional)" type="text"/>
+      </div>
+      
+      <!-- Invoice Date -->
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="invoice-date">Invoice Date</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="invoice-date" type="date"/>
+      </div>
+      
+      <!-- Due Date -->
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="due-date">Payment Due Date</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="due-date" type="date"/>
+      </div>
+      
+      <!-- Discount -->
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700" for="discount">Discount (%) (Optional)</label>
+        <input class="w-full p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="discount" max="100" min="0" placeholder="10" type="number" value="0"/>
+      </div>
+    </div>
+    
+    <!-- Services Management Section -->
+    <div class="mt-6">
+      <h3 class="text-lg font-semibold mb-3 text-js-navy">Services Management</h3>
+      
+      <div class="mb-4">
+        <div class="service-row">
+          <input class="p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy" id="service-description" placeholder="Service Description" type="text"/>
+          <input class="p-2 border border-gray-300 rounded-lg focus:ring-js-navy focus:border-js-navy amount-input" id="service-amount" placeholder="Amount (Rs.)" type="number"/>
+          <button class="bg-js-navy text-white py-2 px-3 rounded-lg font-bold hover:bg-js-red transition duration-200 shadow-custom remove-btn" id="add-service-btn">Add Service</button>
+        </div>
+      </div>
+      
+      <div class="mt-4">
+        <h4 class="text-md font-medium text-gray-700 mb-2">Services Added</h4>
+        <div id="services-list" class="bg-gray-50 rounded-lg">
+          <!-- Services will be populated here -->
+          <p class="text-gray-500 text-center py-4">No services added yet</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="mt-8 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+      <button class="flex-1 bg-js-navy text-white py-3 px-6 rounded-lg font-bold hover:bg-js-red transition duration-200 shadow-custom" id="generate-btn"> Preview / Generate Invoice </button>
+      <button class="flex-1 bg-js-red text-white py-3 px-6 rounded-lg font-bold hover:bg-js-navy transition duration-200 shadow-custom" disabled="" id="download-btn"> Download/Print PDF </button>
+    </div>
+  </div>
+
+  <!-- Invoice Preview Area (Mobile Responsive) -->
+  <div class="w-full max-w-4xl bg-white p-4 md:p-12 rounded-xl shadow-2xl border-t-8 border-js-navy mt-4 mb-12 transform transition duration-500 ease-in-out scale-95 opacity-0" id="invoice-preview">
+    <p class="text-center text-gray-400">Click 'Preview / Generate Invoice' to see the document.</p>
+  </div>
+
+  <!-- Message Box for Feedback (instead of alert()) -->
+  <div class="fixed bottom-4 right-4 bg-js-red text-white p-3 rounded-lg shadow-xl hidden transition duration-300 transform translate-y-full" id="message-box"></div>
+
+  <script id="app-logic">
+    // --- CRITICAL CONFIGURATION DATA ---
+    const MY_COMPANY = {
+      name: "JS CONSULTING",
+      // IMPORTANT: Check that these file names match your local files exactly
+      logoUrl: "./JS Consulting Logo with Slogan.png",
+      signatureUrl: "./Faheem Signature.jpg",
+      // Updated Contact Details
+      address: "Office 23, 2nd Floor, Zeeshan Plaza, G-8 Markaz, Islamabad",
+      ntn: "A122173-7",
+      phone: "+92 302 8762536 | +92 315 4762536",
+      email: "jsconsulting.pk@gmail.com",
+      manager: "Muhammad Faheem Ashraf",
+      managerTitle: "Finance Officer",
+      bank: {
+        name: "Faysal Bank Limited",
+        title: "JS CONSULTING",
+        account: "3341301000002897",
+        iban: "PK50FAYS3341301000002897",
+      }
+    };
+
+    // Services array (empty initially, will be populated manually)
+    let services = [];
+
+    // --- Utility Functions ---
+    // Function to format numbers to Pakistani Rupees
+    const formatCurrency = (amount) => {
+      return `Rs ${Number(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    };
+
+    // Function to convert number to words (Simplified for clarity)
+    const numberToWords = (n) => {
+      const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const num = Math.floor(n);
+      let words = '';
+      if (num === 0) return 'Zero';
+      
+      const parse = (n, name) => {
+        let s = '';
+        if (n > 99) {
+          s += units[Math.floor(n / 100)] + ' Hundred ';
+          n %= 100;
+        }
+        if (n > 19) {
+          s += tens[Math.floor(n / 10)] + ' ';
+          n %= 10;
+        }
+        if (n > 9) {
+          s += teens[n - 10] + ' ';
+        } else if (n > 0) {
+          s += units[n] + ' ';
+        }
+        if (s) s += name + ' ';
+        return s;
+      };
+      
+      words += parse(Math.floor(num / 10000000), 'Crore');
+      words += parse(Math.floor(num / 100000) % 100, 'Lakh');
+      words += parse(Math.floor(num / 1000) % 100, 'Thousand');
+      words += parse(Math.floor(num % 1000), '');
+      
+      // Remove trailing spaces and append "only"
+      return words.trim() + ' only.';
+    };
+
+    // Function to safely get and increment the invoice counter
+    const getNextInvoiceNumber = () => {
+      // Starts at 1220, increments for the next invoice generated
+      let counter = parseInt(localStorage.getItem('invoiceCounter') || '1220', 10);
+      counter++;
+      return `2025-JSC-${String(counter).padStart(4, '0')}`;
+    };
+
+    // Function to set the invoice number input and save the current counter
+    const setInvoiceNumber = (isNewInvoice = false) => {
+      const invoiceNumberInput = document.getElementById('invoice-number');
+      let counter = parseInt(localStorage.getItem('invoiceCounter') || '1220', 10);
+      if (isNewInvoice) {
+        counter++; // Increment for a truly new invoice
+        localStorage.setItem('invoiceCounter', counter);
+      }
+      invoiceNumberInput.value = `2025-JSC-${String(counter).padStart(4, '0')}`;
+    };
+
+    // Function to render services list
+    const renderServicesList = () => {
+      const servicesList = document.getElementById('services-list');
+      servicesList.innerHTML = '';
+      
+      if (services.length === 0) {
+        servicesList.innerHTML = '<p class="text-gray-500 text-center py-4">No services added yet</p>';
+        return;
+      }
+      
+      services.forEach((service, index) => {
+        const serviceItem = document.createElement('div');
+        serviceItem.className = 'service-item';
+        serviceItem.innerHTML = `
+          <span class="flex-grow">${service.description}</span>
+          <span class="font-semibold">${formatCurrency(service.amount)}</span>
+          <div class="service-actions">
+            <button class="bg-js-red text-white rounded hover:bg-red-700 delete-service" data-index="${index}">Delete</button>
+          </div>
+        `;
+        servicesList.appendChild(serviceItem);
+      });
+      
+      // Add event listeners to delete buttons
+      document.querySelectorAll('.delete-service').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const index = parseInt(e.target.getAttribute('data-index'));
+          services.splice(index, 1);
+          renderServicesList();
+          showMessage('Service deleted successfully.');
+        });
+      });
+    };
+
+    // Calculate total amount from services
+    const calculateTotal = () => {
+      return services.reduce((total, service) => total + parseFloat(service.amount), 0);
+    };
+
+    // --- Main Application Logic ---
+    document.addEventListener('DOMContentLoaded', () => {
+      const invoiceNumberInput = document.getElementById('invoice-number');
+      const clientNameInput = document.getElementById('client-name');
+      const invoiceDateInput = document.getElementById('invoice-date');
+      const dueDateInput = document.getElementById('due-date');
+      const discountInput = document.getElementById('discount');
+      const generateBtn = document.getElementById('generate-btn');
+      const downloadBtn = document.getElementById('download-btn');
+      const previewDiv = document.getElementById('invoice-preview');
+      const messageBox = document.getElementById('message-box');
+      const serviceDescriptionInput = document.getElementById('service-description');
+      const serviceAmountInput = document.getElementById('service-amount');
+      const addServiceBtn = document.getElementById('add-service-btn');
+
+      // 1. Initial Setup
+      // Set initial Invoice Number
+      setInvoiceNumber(false);
+      
+      // Set today's date and a default due date (e.g., 2 days later)
+      const today = new Date();
+      invoiceDateInput.valueAsDate = today;
+      const defaultDueDate = new Date(today);
+      defaultDueDate.setDate(today.getDate() + 2);
+      dueDateInput.valueAsDate = defaultDueDate;
+      
+      // Render empty services list
+      renderServicesList();
+
+      // 2. Event Handlers
+      // Show persistent messages (for errors or success)
+      const showMessage = (msg, isError = false) => {
+        messageBox.textContent = msg;
+        messageBox.className = `fixed bottom-4 right-4 p-3 rounded-lg shadow-xl transition duration-300 ${isError ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} transform translate-y-0`;
+        messageBox.style.display = 'block';
+        setTimeout(() => {
+          messageBox.classList.remove('translate-y-0');
+          messageBox.classList.add('translate-y-full');
+        }, 4000);
+      };
+
+      // Add Service Button
+      addServiceBtn.addEventListener('click', () => {
+        const description = serviceDescriptionInput.value.trim();
+        const amount = parseFloat(serviceAmountInput.value);
+        
+        if (!description || isNaN(amount) || amount <= 0) {
+          showMessage('Please enter both service description and a valid amount.', true);
+          return;
+        }
+        
+        services.push({
+          description,
+          amount
+        });
+        
+        renderServicesList();
+        serviceDescriptionInput.value = '';
+        serviceAmountInput.value = '';
+        serviceDescriptionInput.focus();
+        showMessage('Service added successfully.');
+      });
+
+      // Allow adding service with Enter key
+      serviceDescriptionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          serviceAmountInput.focus();
+        }
+      });
+      
+      serviceAmountInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addServiceBtn.click();
+        }
+      });
+
+      // GENERATE / PREVIEW BUTTON
+      generateBtn.addEventListener('click', () => {
+        // Validation
+        const clientName = clientNameInput.value.trim();
+        const clientCompany = (document.getElementById('client-company')?.value || '').trim();
+        const invoiceNumber = invoiceNumberInput.value;
+        
+        if (!clientName) {
+          showMessage("Please fill in Client Name.", true);
+          return;
+        }
+        
+        if (services.length === 0) {
+          showMessage("Please add at least one service.", true);
+          return;
+        }
+        
+        // Calculations
+        const discountPercent = parseFloat(discountInput.value) || 0;
+        const subTotal = calculateTotal();
+        // Calculate Discounted Amount
+        const discountAmount = subTotal * (discountPercent / 100);
+        const grandTotal = subTotal - discountAmount;
+        
+        // Generate Invoice HTML
+        previewDiv.innerHTML = generateInvoiceHtml({
+          invoiceNumber,
+          clientName,
+          clientCompany,
+          invoiceDate: invoiceDateInput.value,
+          dueDate: dueDateInput.value,
+          subTotal,
+          discountPercent,
+          discountAmount,
+          grandTotal,
+        });
+        
+        // Show Preview and Enable Download
+        previewDiv.classList.remove('scale-95', 'opacity-0');
+        previewDiv.classList.add('scale-100', 'opacity-100');
+        downloadBtn.disabled = false;
+        generateBtn.textContent = 'Update Invoice Preview';
+        
+        // Auto-increment the invoice number for the *next* invoice
+        setInvoiceNumber(true);
+        showMessage(`Invoice ${invoiceNumber} generated successfully.`);
+      });
+
+      // DOWNLOAD BUTTON
+      downloadBtn.addEventListener('click', async () => {
+        try {
+          const clientName = (document.getElementById('client-name')?.value || 'Invoice').trim() || 'Invoice';
+          const fileName = `Inv_${clientName}.pdf`;
+          const element = document.getElementById('invoice-preview');
+          
+          // High-quality PDF options
+          const opt = {
+            margin: [10, 10, 10, 10], // in px
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+              scale: 2, 
+              useCORS: true, 
+              backgroundColor: '#FFFFFF',
+              logging: false,
+              scrollX: 0,
+              scrollY: 0
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+          };
+          
+          // Generate PDF
+          const pdf = await html2pdf().set(opt).from(element).save();
+          showMessage(`Saved ${fileName}`, false);
+        } catch (e) {
+          console.error('PDF generation error:', e);
+          showMessage('Failed to generate PDF. Please try again.', true);
+        }
+      });
+
+      // 3. Invoice HTML Template Function
+      const generateInvoiceHtml = (data) => {
+        // Generate services rows
+        const servicesRows = services.map((service, index) => `
+          <tr class="border-b border-gray-200 hover:bg-light-gray transition duration-150">
+            <td class="p-3 text-gray-700">${index + 1}</td>
+            <td class="p-3 font-semibold">${service.description}</td>
+            <td class="p-3 text-right text-gray-800">${formatCurrency(service.amount)}</td>
+          </tr>
+        `).join('');
+        
+        return `
+          <!-- Invoice Content -->
+          <div class="flex justify-between items-center pb-6 border-b border-gray-200">
+            <div class="flex items-center space-x-4">
+              <!-- Logo (Circular Style) -->
+              <div class="h-16 w-16 md:h-20 md:w-20 rounded-full bg-js-navy flex items-center justify-center overflow-hidden border-2 border-js-red shrink-0">
+                <img src="${MY_COMPANY.logoUrl}" alt="JS Consulting Logo" class="w-full h-full object-cover p-1" onerror="this.onerror=null;this.parentElement.innerHTML='<span class=\'text-white text-xs\'>JS</span>'">
+              </div>
+              <div>
+                <h1 class="text-xl md:text-2xl font-extrabold text-js-navy">${MY_COMPANY.name}</h1>
+                <p class="text-xs md:text-sm text-gray-500">Tax | Corporate | Accounting</p>
+              </div>
+            </div>
+            <h2 class="text-2xl md:text-3xl font-black text-js-red uppercase shrink-0 ml-4">INVOICE</h2>
+          </div>
+          
+          <!-- Company & Client Details -->
+          <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+            <div class="md:col-span-2">
+              <div class="bg-js-navy text-white p-3 rounded-t-lg font-semibold">Billed By</div>
+              <div class="p-3 border border-gray-200 rounded-b-lg space-y-1">
+                <p class="font-bold">${MY_COMPANY.name}</p>
+                <p><span class="font-bold">Address: </span>${MY_COMPANY.address}</p>
+                <p><span class="font-bold">NTN #: </span>${MY_COMPANY.ntn}</p>
+                <p><span class="font-bold">Phone: </span>${MY_COMPANY.phone}</p>
+                <p><span class="font-bold">Email: </span>${MY_COMPANY.email}</p>
+              </div>
+            </div>
+            <div class="md:col-span-1">
+              <div class="bg-light-gray p-3 rounded-t-lg font-semibold text-gray-700">Billed To</div>
+              <div class="p-3 border border-gray-200 rounded-b-lg space-y-1">
+                <p class="font-bold">${data.clientName}</p>
+                ${data.clientCompany ? `<p class="text-gray-700 font-medium">${data.clientCompany}</p>` : ''}
+              </div>
+            </div>
+          </div>
+          
+          <!-- Invoice Summary -->
+          <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-semibold text-center bg-light-gray p-3 rounded-lg border border-gray-200">
+            <div>
+              <p class="text-gray-500">INVOICE NO.</p>
+              <p class="text-js-navy ">${data.invoiceNumber}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">DATE</p>
+              <p>${new Date(data.invoiceDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">DUE DATE</p>
+              <p class="text-js-red">${new Date(data.dueDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">AMOUNT DUE</p>
+              <p class="text-xl text-js-red font-extrabold">${formatCurrency(data.grandTotal)}</p>
+            </div>
+          </div>
+          
+          <!-- Service Details Table -->
+          <div class="mt-8 overflow-x-auto">
+            <table class="min-w-full table-auto">
+              <thead>
+                <tr class="bg-js-navy text-white text-left text-sm">
+                  <th class="p-3 w-1/12 rounded-tl-lg">#</th>
+                  <th class="p-3 w-8/12">DESCRIPTION OF SERVICE</th>
+                  <th class="p-3 w-3/12 text-right rounded-tr-lg">AMOUNT (Rs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${servicesRows}
+                <tr><td colspan="3" class="p-1"></td></tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Totals & Payment Section -->
+          <div class="mt-8 flex justify-end">
+            <div class="w-full md:w-1/2">
+              <div class="space-y-2 border border-gray-200 p-4 rounded-lg">
+                <!-- Subtotal -->
+                <div class="flex justify-between items-center text-md font-medium text-gray-700">
+                  <span>Subtotal:</span>
+                  <span>${formatCurrency(data.subTotal)}</span>
+                </div>
+                <!-- Discount Row (Only show if discount is applied) -->
+                ${data.discountPercent > 0 ? `
+                <div class="flex justify-between items-center text-sm font-medium text-js-red border-t pt-2 border-dashed">
+                  <span>Discount (${data.discountPercent}%):</span>
+                  <span>- ${formatCurrency(data.discountAmount)}</span>
+                </div>
+                ` : ''}
+                <!-- GRAND TOTAL -->
+                <div class="flex justify-between items-center pt-2 mt-2 border-t-4 border-js-navy bg-light-gray p-2 rounded text-lg font-extrabold text-js-navy">
+                  <span>GRAND TOTAL:</span>
+                  <span>${formatCurrency(data.grandTotal)}</span>
+                </div>
+              </div>
+              <p class="text-sm font-semibold text-gray-600 mt-4 italic">
+                Amount in Words: ${numberToWords(data.grandTotal)}
+              </p>
+            </div>
+          </div>
+          
+          <!-- Bank Details and Signature -->
+          <div class="mt-12 pt-6 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Bank Details -->
+            <div>
+              <h3 class="font-bold text-md text-js-navy mb-2">Payment Details</h3>
+              <div class="text-xs space-y-1 bg-light-gray p-3 rounded-lg border border-gray-200">
+                <p><span class="font-semibold">Bank:</span> ${MY_COMPANY.bank.name}</p>
+                <p><span class="font-semibold">Account Title:</span> ${MY_COMPANY.bank.title}</p>
+                <p><span class="font-semibold">Account #:</span> ${MY_COMPANY.bank.account}</p>
+                <p><span class="font-semibold">IBAN:</span> ${MY_COMPANY.bank.iban}</p>
+              </div>
+            </div>
+            <!-- Signature -->
+            <div class="text-left">
+              <!-- Signature Image with fallback -->
+              <img src="${MY_COMPANY.signatureUrl}" alt="${MY_COMPANY.manager} Signature" class="h-16 w-auto mt-8 mb-2 ml-36 mix-blend-multiply" onerror="this.onerror=null;this.style.display='none';this.parentElement.innerHTML+='<div class=\'h-16 border-b border-gray-400 w-3/4 mx-auto md:mr-0 mb-2\'></div>';">
+              <p class="font-semibold text-sm text-js-navy border-t border-gray-700 w-3/4 mx-auto md:mr-0 pt-1 mt-1">
+                ${MY_COMPANY.manager}
+              </p>
+              <p class="text-xs text-gray-600 ml-36">${MY_COMPANY.managerTitle}</p>
+            </div>
+          </div>
+        `;
+      };
+    });
+  </script>
+
+  <!-- html2pdf.js for pixel-perfect PDF (uses html2canvas + jsPDF) -->
+  <script crossorigin="anonymous" integrity="sha512-YcsIP+GdH2oZV6D5M/0W2b7z8QX6g5xg8c3E3p2+3p6m8bQm2J4j3o6gG8L5wWQjv5H0H0L8G3i2Fv6Q0x8lBw==" referrerpolicy="no-referrer" src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+</html>
